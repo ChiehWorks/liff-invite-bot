@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>邀請連結</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f7f9; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #1A458B; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin-bottom: 15px;}
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .container { text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="loader" style="margin: 0 auto;"></div>
+        <div id="status" style="color: #666; margin-top: 15px;">正在為您連結推薦人...</div>
+    </div>
+
+    <script>
+        const LIFF_ID = '2009537146-Ajd4v4RR'; 
+        const params = new URLSearchParams(window.location.search);
+        const REF_CODE = params.get('ref') || 'none';
+
+        async function main() {
+            try {
+                await liff.init({ liffId: LIFF_ID });
+                
+                if (liff.isInClient()) {
+                    await liff.sendMessages([{ type: 'text', text: 'ref=' + REF_CODE }]);
+                    liff.closeWindow();
+                } else {
+                    document.getElementById('status').innerText = '請在 LINE App 內開啟此連結';
+                    document.querySelector('.loader').style.display = 'none';
+                }
+            } catch (error) {
+                document.getElementById('status').innerHTML = '🔴 系統異常：<br>' + error.message;
+                document.querySelector('.loader').style.display = 'none';
+            }
+        }
+        
+        window.addEventListener('load', main);
+    </script>
+</body>
+</html>
