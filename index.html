@@ -3,40 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>邀請連結</title>
+    <title>光電AI助理 - 專屬邀請</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f7f9; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #1A458B; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin-bottom: 15px;}
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f7f9; }
+        .loader { border: 4px solid #e0e0e0; border-top: 4px solid #1A458B; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px;}
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .container { text-align: center; }
+        .status-text { color: #333; font-size: 18px; font-weight: bold; }
+        .sub-text { color: #888; font-size: 14px; margin-top: 10px; text-align: center; line-height: 1.5; padding: 0 20px;}
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="loader" style="margin: 0 auto;"></div>
-        <div id="status" style="color: #666; margin-top: 15px;">正在為您連結推薦人...</div>
-    </div>
+    <div class="loader" id="loader"></div>
+    <div id="status" class="status-text">讀取專屬優惠中...</div>
+    <div id="sub-status" class="sub-text">請稍候，即將為您導向光電AI助理</div>
 
     <script>
+        // ==========================================
+        // 🛠️ 【請修改這裡】填入你的 3 個專屬參數
+        // ==========================================
         const LIFF_ID = '2009537146-Ajd4v4RR'; 
+        
+        // 1. 貼上你剛在 n8n 建立的 POST Webhook 網址
+        const N8N_WEBHOOK_URL = 'https://chiehworks-n8n.zeabur.app/webhook/4fff590d-9784-4723-8e00-0b75e32ad9f9'; 
+        
+        // 2. 貼上你的 LINE 官方帳號加入連結 (格式通常是 https://line.me/R/ti/p/@你的專屬ID)
+        const LINE_BOT_URL = 'https://line.me/R/ti/p/@715kvjqb'; 
+        // ==========================================
+
         const params = new URLSearchParams(window.location.search);
         const REF_CODE = params.get('ref') || 'none';
 
         async function main() {
             try {
+                // 1. 啟動 LIFF 引擎
                 await liff.init({ liffId: LIFF_ID });
                 
-                if (liff.isInClient()) {
-                    await liff.sendMessages([{ type: 'text', text: 'ref=' + REF_CODE }]);
-                    liff.closeWindow();
-                } else {
-                    document.getElementById('status').innerText = '請在 LINE App 內開啟此連結';
-                    document.querySelector('.loader').style.display = 'none';
+                // 2. 確保使用者已授權 (未授權會自動跳出授權畫面)
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
                 }
+
+                document.getElementById('status').innerText = '驗證資料中...';
+
+                // 3. 取得點擊者的 LINE 個人檔案 (包含 User ID)
+                const profile = await liff.getProfile();
+                const clickerId = profile.userId;
+
+                // 4. 【無痕歸因】在背景偷偷把資料傳給 n8n
+                if (REF_CODE !== 'none') {
+                    await fetch(N8N_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'referral_click',
+                            referrer_code: REF_CODE,        // 誰推薦的
+                            new_user_id: clickerId,         // 點擊者是誰
+                            display_name: profile.displayName // 點擊者的暱稱(方便你後台看)
+                        })
+                    });
+                }
+
+                document.getElementById('status').innerText = '準備跳轉...';
+
+                // 5. 【自動導航】完美落地：直接把使用者帶去加「光電AI助理」好友
+                window.location.href = LINE_BOT_URL;
+
             } catch (error) {
-                document.getElementById('status').innerHTML = '🔴 系統異常：<br>' + error.message;
-                document.querySelector('.loader').style.display = 'none';
+                console.error('LIFF Error:', error);
+                document.getElementById('status').innerHTML = '🔴 系統異常，請稍後再試。';
+                document.getElementById('sub-status').innerHTML = '錯誤訊息: ' + error.message;
+                document.getElementById('loader').style.display = 'none';
             }
         }
         
